@@ -79,47 +79,8 @@
   </div>
 
   <script>
-    const contractAddress = '0xDaA87136e1dC0Ae7F32aA35e2c1b3310F76BBC4C';
+    const contractAddress = '0xCC7a7AaEF4986DbfBfFaAA5f3037eaa932c79D51';
     const contractABI = [
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "address",
-				"name": "voter",
-				"type": "address"
-			}
-		],
-		"name": "VoterApproved",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "address",
-				"name": "voter",
-				"type": "address"
-			}
-		],
-		"name": "VoterRegistrationRequested",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "address",
-				"name": "voter",
-				"type": "address"
-			}
-		],
-		"name": "VoterRejected",
-		"type": "event"
-	},
 	{
 		"inputs": [
 			{
@@ -175,10 +136,22 @@
 	},
 	{
 		"inputs": [],
+		"name": "resetVoting",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "startVoting",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
+	},
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
 	},
 	{
 		"inputs": [
@@ -194,9 +167,43 @@
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"stateMutability": "nonpayable",
-		"type": "constructor"
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "voter",
+				"type": "address"
+			}
+		],
+		"name": "VoterApproved",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "voter",
+				"type": "address"
+			}
+		],
+		"name": "VoterRegistrationRequested",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "voter",
+				"type": "address"
+			}
+		],
+		"name": "VoterRejected",
+		"type": "event"
 	},
 	{
 		"inputs": [
