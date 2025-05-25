@@ -11,6 +11,7 @@ export function useWeb3() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [networkId, setNetworkId] = useState<number | null>(null);
 
   // Initialize Web3
   useEffect(() => {
@@ -30,9 +31,25 @@ export function useWeb3() {
           setContract(contract);
           setAccount(account);
           
+          // Get network information
+          try {
+            const netId = await web3.eth.net.getId();
+            setNetworkId(netId);
+            console.log(`Connected to network ID: ${netId}`);
+          } catch (netErr) {
+            console.error('Error getting network ID:', netErr);
+          }
+          
           // Check if connected account is admin
-          const adminStatus = await checkIfAdmin(contract, account);
-          setIsAdmin(adminStatus);
+          try {
+            console.log(`Checking if account ${account} is admin`);
+            const adminStatus = await checkIfAdmin(contract, account);
+            console.log(`Account ${account} admin status: ${adminStatus}`);
+            setIsAdmin(adminStatus);
+          } catch (adminErr) {
+            console.error('Error checking admin status:', adminErr);
+            setIsAdmin(false);
+          }
         }
         
         setIsLoading(false);
@@ -48,24 +65,39 @@ export function useWeb3() {
     // Setup account change listener
     if (window.ethereum) {
       const handleAccountsChanged = async (accounts: string[]) => {
+        console.log('Accounts changed:', accounts);
         if (accounts.length === 0) {
           setAccount('');
           setIsAdmin(false);
         } else {
-          setAccount(accounts[0]);
+          const newAccount = accounts[0];
+          console.log(`Switched to account: ${newAccount}`);
+          setAccount(newAccount);
           
           // Update admin status when account changes
           if (contract) {
-            const adminStatus = await checkIfAdmin(contract, accounts[0]);
-            setIsAdmin(adminStatus);
+            try {
+              const adminStatus = await checkIfAdmin(contract, newAccount);
+              console.log(`New account ${newAccount} admin status: ${adminStatus}`);
+              setIsAdmin(adminStatus);
+            } catch (err) {
+              console.error('Error checking admin status after account change:', err);
+            }
           }
         }
       };
       
+      const handleChainChanged = (_chainId: string) => {
+        console.log('Chain changed. Reloading page...');
+        window.location.reload();
+      };
+      
       window.ethereum.on('accountsChanged', handleAccountsChanged);
+      window.ethereum.on('chainChanged', handleChainChanged);
       
       return () => {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum.removeListener('chainChanged', handleChainChanged);
       };
     }
   }, []);
@@ -73,14 +105,23 @@ export function useWeb3() {
   // Function to refresh the current account
   const refreshAccount = useCallback(async () => {
     try {
+      console.log('Refreshing account information...');
       const currentAccount = await getCurrentAccount();
       if (currentAccount) {
+        console.log(`Current account: ${currentAccount}`);
         setAccount(currentAccount);
         
         if (contract) {
-          const adminStatus = await checkIfAdmin(contract, currentAccount);
-          setIsAdmin(adminStatus);
+          try {
+            const adminStatus = await checkIfAdmin(contract, currentAccount);
+            console.log(`Refreshed admin status: ${adminStatus}`);
+            setIsAdmin(adminStatus);
+          } catch (err) {
+            console.error('Error checking admin status during refresh:', err);
+          }
         }
+      } else {
+        console.warn('No account found during refresh');
       }
       return currentAccount;
     } catch (err) {
@@ -96,6 +137,7 @@ export function useWeb3() {
     isAdmin,
     error,
     isLoading,
+    networkId,
     refreshAccount
   };
 }

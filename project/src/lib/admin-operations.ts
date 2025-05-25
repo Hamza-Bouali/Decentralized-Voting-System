@@ -1,12 +1,13 @@
-import { withAutoAccount, ensureAccount } from './account-utils';
 import { checkIfAdmin } from './web3';
 
 /**
  * Safe implementation of getRegistrationRequests with proper account handling
  */
-export const getRegistrationRequestsSafe = async (contract: any): Promise<string[]> => {
+export const getRegistrationRequestsSafe = async (contract: any, account: string): Promise<string[]> => {
   try {
-    const account = await ensureAccount('getRegistrationRequestsSafe');
+    if (!account) {
+      throw new Error(`No account provided to getRegistrationRequestsSafe`);
+    }
     
     console.log(`Getting registration requests with account: ${account}`);
     
@@ -24,38 +25,115 @@ export const getRegistrationRequestsSafe = async (contract: any): Promise<string
   }
 };
 
+interface Contract {
+  methods: {
+    getRegistrationRequests(): {
+      call(options: { from: string }): Promise<string[]>;
+    };
+    addCandidate(name: string): {
+      send(options: { from: string }): Promise<any>;
+    };
+    approveVoter(voterAddress: string): {
+      send(options: { from: string }): Promise<any>;
+    };
+    rejectVoterRequest(voterAddress: string): {
+      send(options: { from: string }): Promise<any>;
+    };
+    startVoting(): {
+      send(options: { from: string }): Promise<any>;
+    };
+    endVoting(): {
+      send(options: { from: string }): Promise<any>;
+    };
+    resetVoting(): {
+      send(options: { from: string }): Promise<any>;
+    };
+  };
+}
+
+// Define withAutoAccount type but don't implement it yet
+type WithAutoAccountFn = <T extends (...args: any[]) => Promise<any>>(fn: T) => T;
+
+// Define a mock implementation instead of using the import
+const withAutoAccount: WithAutoAccountFn = <T extends (...args: any[]) => Promise<any>>(fn: T): T => {
+  // This is a simple wrapper that just forwards the call
+  // In a real implementation, this would handle account selection
+  return (async (...args: any[]): Promise<any> => {
+    try {
+      return await fn(...args);
+    } catch (error) {
+      console.error('Error in withAutoAccount:', error);
+      throw error;
+    }
+  }) as T;
+};
+
+// Also define a mock ensureAccount function
+const ensureAccount = async (functionName: string): Promise<string> => {
+  console.log(`ensureAccount called for ${functionName}`);
+  throw new Error('ensureAccount not properly implemented');
+};
+
+export const resetVoting: (contract: Contract, account: string) => Promise<any> = withAutoAccount(
+  async (contract: Contract, account: string) => {
+    await checkAdminAccess(contract, account);
+    return await contract.methods.resetVoting().send({ from: account });
+  }
+);
+
 /**
  * Create auto-account versions of admin functions
  */
-export const autoAccountAdminFunctions = {
-  getRegistrationRequests: withAutoAccount(async (contract, account) => {
-    return await contract.methods.getRegistrationRequests().call({ from: account });
-  }),
+interface AutoAccountAdminFunctions {
+  getRegistrationRequests: (contract: Contract, account: string) => Promise<string[]>;
+  addCandidate: (contract: Contract, account: string, name: string) => Promise<any>;
+  approveVoter: (contract: Contract, account: string, voterAddress: string) => Promise<any>;
+  rejectVoter: (contract: Contract, account: string, voterAddress: string) => Promise<any>;
+  startVoting: (contract: Contract, account: string) => Promise<any>;
+  endVoting: (contract: Contract, account: string) => Promise<any>;
+}
+
+export const autoAccountAdminFunctions: AutoAccountAdminFunctions = {
+  getRegistrationRequests: withAutoAccount(
+    async (contract: Contract, account: string) => {
+      return await contract.methods.getRegistrationRequests().call({ from: account });
+    }
+  ),
   
-  addCandidate: withAutoAccount(async (contract, account, name) => {
-    await checkAdminAccess(contract, account);
-    return await contract.methods.addCandidate(name).send({ from: account });
-  }),
+  addCandidate: withAutoAccount(
+    async (contract: Contract, account: string, name: string) => {
+      await checkAdminAccess(contract, account);
+      return await contract.methods.addCandidate(name).send({ from: account });
+    }
+  ),
   
-  approveVoter: withAutoAccount(async (contract, account, voterAddress) => {
-    await checkAdminAccess(contract, account);
-    return await contract.methods.approveVoter(voterAddress).send({ from: account });
-  }),
+  approveVoter: withAutoAccount(
+    async (contract: Contract, account: string, voterAddress: string) => {
+      await checkAdminAccess(contract, account);
+      return await contract.methods.approveVoter(voterAddress).send({ from: account });
+    }
+  ),
   
-  rejectVoter: withAutoAccount(async (contract, account, voterAddress) => {
-    await checkAdminAccess(contract, account);
-    return await contract.methods.rejectVoterRequest(voterAddress).send({ from: account });
-  }),
+  rejectVoter: withAutoAccount(
+    async (contract: Contract, account: string, voterAddress: string) => {
+      await checkAdminAccess(contract, account);
+      return await contract.methods.rejectVoterRequest(voterAddress).send({ from: account });
+    }
+  ),
   
-  startVoting: withAutoAccount(async (contract, account) => {
-    await checkAdminAccess(contract, account);
-    return await contract.methods.startVoting().send({ from: account });
-  }),
+  startVoting: withAutoAccount(
+    async (contract: Contract, account: string) => {
+      await checkAdminAccess(contract, account);
+      return await contract.methods.startVoting().send({ from: account });
+    }
+  ),
   
-  endVoting: withAutoAccount(async (contract, account) => {
-    await checkAdminAccess(contract, account);
-    return await contract.methods.endVoting().send({ from: account });
-  })
+  endVoting: withAutoAccount(
+    async (contract: Contract, account: string) => {
+      await checkAdminAccess(contract, account);
+      return await contract.methods.endVoting().send({ from: account });
+    }
+  )
 };
 
 /**
@@ -74,18 +152,17 @@ async function checkAdminAccess(contract: any, account: string): Promise<void> {
  */
 export const createAdminOperations = (contract: any) => {
   return {
-    getRegistrationRequests: async () => {
+    getRegistrationRequests: async (account: string) => {
       try {
-        return await getRegistrationRequestsSafe(contract);
+        return await getRegistrationRequestsSafe(contract, account);
       } catch (error) {
         console.error('Error getting registration requests:', error);
         throw error;
       }
     },
     
-    addCandidate: async (name: string) => {
+    addCandidate: async (name: string, account: string) => {
       try {
-        const account = await ensureAccount('addCandidate');
         await checkAdminAccess(contract, account);
         await contract.methods.addCandidate(name).send({ from: account });
         return { success: true, message: 'Candidate added successfully.' };

@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import ConnectWallet from './components/ConnectWallet';
 import AccountInfo from './components/AccountInfo';
 import CandidateList from './components/CandidateList';
 import VoterPanel from './components/VoterPanel';
 import AdminPanel from './components/AdminPanel';
 import Dashboard from './pages/Dashboard';
-import { Candidate, Voter, Web3State, VotingState } from './types';
+import { Candidate, Voter, Web3State, VotingState, ActionResult, Contract } from './types';
 import { 
   initializeWeb3,
   checkIfAdmin,
@@ -20,8 +20,17 @@ import {
   rejectVoter,
   startVoting,
   endVoting,
-  getRegistrationRequests
+  getRegistrationRequests,
+  resetVoting
 } from './lib/web3';
+
+// Extend CandidateListProps interface for the isLoading prop
+interface ExtendedCandidateListProps {
+  candidates: Candidate[];
+  totalVotes: number;
+  onRefresh: () => void;
+  isLoading?: boolean;
+}
 
 function App() {
   const [web3State, setWeb3State] = useState<Web3State>({
@@ -47,8 +56,20 @@ function App() {
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [isCandidatesLoading, setIsCandidatesLoading] = useState(false);
+  const [totalVotes, setTotalVotes] = useState(0);
 
   const [currentView, setCurrentView] = useState<'voter' | 'admin' | 'dashboard'>('voter');
+
+  const handleResetVoting = async (): Promise<ActionResult> => {
+    if (!web3State.contract || !web3State.account) return { success: false, message: 'Wallet not connected' };
+  
+    const result = await resetVoting(web3State.contract, web3State.account);
+    if (result.success) {
+      await handleRefreshStatus();
+      await loadCandidates(); // Make sure we refresh candidate data too
+    }
+    return result;
+  };
 
   useEffect(() => {
     const connectToWeb3 = async () => {
@@ -67,12 +88,12 @@ function App() {
 
           await refreshData(contract, account);
         } else {
-          setWeb3State(prev => ({ ...prev, error }));
+          setWeb3State(prevState => ({ ...prevState, error }));
         }
       } catch (error) {
         console.error('Failed to initialize Web3:', error);
-        setWeb3State(prev => ({ 
-          ...prev, 
+        setWeb3State(prevState => ({ 
+          ...prevState, 
           error: 'Failed to connect to blockchain. Please check your connection and try again.' 
         }));
       }
@@ -99,7 +120,7 @@ function App() {
     };
   }, []);
 
-  const refreshData = async (contract: any, account: string) => {
+  const refreshData = async (contract: Contract, account: string) => {
     try {
       const voterStatus = await getVoterStatus(contract, account);
       setVoter(voterStatus);
@@ -129,12 +150,12 @@ function App() {
 
         await refreshData(contract, account);
       } else {
-        setWeb3State(prev => ({ ...prev, error }));
+        setWeb3State(prevState => ({ ...prevState, error }));
       }
     } catch (error) {
       console.error('Failed to initialize Web3:', error);
-      setWeb3State(prev => ({ 
-        ...prev, 
+      setWeb3State(prevState => ({ 
+        ...prevState, 
         error: 'Failed to connect to blockchain. Please check your connection and try again.' 
       }));
     }
@@ -153,6 +174,14 @@ function App() {
     try {
       const candidatesList = await getCandidates(web3State.contract);
       setCandidates(candidatesList);
+      
+      // Calculate total votes
+      const totalVotesCount = candidatesList.reduce(
+        (sum, candidate) => sum + parseInt(candidate.voteCount), 
+        0
+      );
+      setTotalVotes(totalVotesCount);
+      
     } catch (error) {
       console.error('Error loading candidates:', error);
     } finally {
@@ -160,7 +189,8 @@ function App() {
     }
   };
 
-  const handleRequestRegistration = async () => {
+  // These functions aren't used in this component, but they're kept for potential future use
+  const handleRequestRegistration = async (): Promise<ActionResult> => {
     if (!web3State.contract || !web3State.account) return { success: false, message: 'Wallet not connected' };
     
     const result = await requestRegistration(web3State.contract, web3State.account);
@@ -170,7 +200,7 @@ function App() {
     return result;
   };
 
-  const handleVote = async (candidateId: string) => {
+  const handleVote = async (candidateId: string): Promise<ActionResult> => {
     if (!web3State.contract || !web3State.account) return { success: false, message: 'Wallet not connected' };
     
     const result = await voteForCandidate(web3State.contract, web3State.account, candidateId);
@@ -181,12 +211,12 @@ function App() {
     return result;
   };
 
-  const handleGetWinner = async () => {
+  const handleGetWinner = async (): Promise<string> => {
     if (!web3State.contract) return 'Wallet not connected';
     return await getWinner(web3State.contract);
   };
 
-  const handleAddCandidate = async (name: string) => {
+  const handleAddCandidate = async (name: string): Promise<ActionResult> => {
     if (!web3State.contract || !web3State.account) return { success: false, message: 'Wallet not connected' };
     
     const result = await addCandidate(web3State.contract, web3State.account, name);
@@ -196,17 +226,17 @@ function App() {
     return result;
   };
 
-  const handleApproveVoter = async (address: string) => {
+  const handleApproveVoter = async (address: string): Promise<ActionResult> => {
     if (!web3State.contract || !web3State.account) return { success: false, message: 'Wallet not connected' };
     return await approveVoter(web3State.contract, web3State.account, address);
   };
 
-  const handleRejectVoter = async (address: string) => {
+  const handleRejectVoter = async (address: string): Promise<ActionResult> => {
     if (!web3State.contract || !web3State.account) return { success: false, message: 'Wallet not connected' };
     return await rejectVoter(web3State.contract, web3State.account, address);
   };
 
-  const handleStartVoting = async () => {
+  const handleStartVoting = async (): Promise<ActionResult> => {
     if (!web3State.contract || !web3State.account) return { success: false, message: 'Wallet not connected' };
     
     const result = await startVoting(web3State.contract, web3State.account);
@@ -216,7 +246,7 @@ function App() {
     return result;
   };
 
-  const handleEndVoting = async () => {
+  const handleEndVoting = async (): Promise<ActionResult> => {
     if (!web3State.contract || !web3State.account) return { success: false, message: 'Wallet not connected' };
     
     const result = await endVoting(web3State.contract, web3State.account);
@@ -226,10 +256,13 @@ function App() {
     return result;
   };
 
-  const handleGetRequests = async () => {
-    if (!web3State.contract) return [];
-    return await getRegistrationRequests(web3State.contract);
+  const handleGetRequests = async (): Promise<string[]> => {
+    if (!web3State.contract || !web3State.account) return [];
+    return await getRegistrationRequests(web3State.contract, web3State.account);
   };
+
+  // Destructure fields omitting error since we handle it differently
+  const { contract, account, isAdmin } = web3State;
 
   if (!web3State.isConnected) {
     return <ConnectWallet onConnect={handleConnect} error={web3State.error} />;
@@ -306,37 +339,41 @@ function App() {
             
             <CandidateList
               candidates={candidates}
+              totalVotes={totalVotes}
               onRefresh={loadCandidates}
               isLoading={isCandidatesLoading}
             />
           </div>
           
           <div className="md:col-span-2">
-            {currentView === 'dashboard' && (
-              <Dashboard />
-            )}
-            
-            {currentView === 'voter' && (
-              <VoterPanel
-                voter={voter}
-                votingStatus={votingStatus}
-                onRequestRegistration={handleRequestRegistration}
-                onVote={handleVote}
-                onGetWinner={handleGetWinner}
-              />
-            )}
-            
-            {currentView === 'admin' && web3State.isAdmin && (
-              <AdminPanel
-                votingStatus={votingStatus}
-                onAddCandidate={handleAddCandidate}
-                onApproveVoter={handleApproveVoter}
-                onRejectVoter={handleRejectVoter}
-                onStartVoting={handleStartVoting}
-                onEndVoting={handleEndVoting}
-                onGetRequests={handleGetRequests}
-              />
-            )}
+            <div className="container mx-auto px-4 py-8">
+              {currentView === 'dashboard' && (
+                <Dashboard />
+              )}
+              
+              {currentView === 'voter' && (
+                <VoterPanel 
+                  contract={contract} 
+                  account={account} 
+                />
+              )}
+              
+              {currentView === 'admin' && isAdmin && (
+                <AdminPanel 
+                  contract={contract} 
+                  account={account}
+                  onResetVoting={handleResetVoting}
+                  // Fallback handlers in case direct Web3 access fails
+                  onAddCandidate={handleAddCandidate}
+                  onApproveVoter={handleApproveVoter}
+                  onRejectVoter={handleRejectVoter}
+                  onStartVoting={handleStartVoting}
+                  onEndVoting={handleEndVoting}
+                  onGetRequests={handleGetRequests}
+                  votingStatus={votingStatus}
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>

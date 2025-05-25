@@ -1,5 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import Chart from 'chart.js/auto';
+import { Chart, registerables } from 'chart.js';
+
+// Register Chart.js components
+Chart.register(...registerables);
 
 interface Candidate {
   id: string;

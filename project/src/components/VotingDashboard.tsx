@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { getCandidates, getVotingStatus } from '../lib/web3';
-import Chart from 'chart.js/auto';
+import { Chart, registerables } from 'chart.js';
+
+// Register all the components needed
+Chart.register(...registerables);
 
 interface Candidate {
   id: string;

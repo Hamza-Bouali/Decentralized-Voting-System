@@ -16,6 +16,11 @@ export const initializeWeb3 = async () => {
 
       // Set up event listener for account changes
       window.ethereum.on('accountsChanged', (newAccounts: string[]) => {
+        // Log the new account being used
+        if (newAccounts.length > 0) {
+          console.log(`Account changed from ${currentConnectedAccount} to ${newAccounts[0]}`);
+          currentConnectedAccount = newAccounts[0];
+        }
         // Force reload to ensure the UI reflects the new account state
         window.location.reload();
       });
@@ -52,10 +57,16 @@ export const initializeWeb3 = async () => {
   }
 };
 
-export const checkIfAdmin = async (contract: any, account: string) => {
+export const checkIfAdmin = async (contract: any, account: string): Promise<boolean> => {
   try {
     if (!account) {
-      console.error('No account provided to checkIfAdmin', new Error().stack);
+      const errorMsg = 'No account provided to checkIfAdmin';
+      console.error(errorMsg, new Error().stack);
+      throw new Error(errorMsg);
+    }
+
+    if (!contract) {
+      console.error('No contract provided to checkIfAdmin');
       return false;
     }
 
@@ -271,6 +282,25 @@ export const rejectVoter = async (contract: any, account: string, voterAddress: 
 
 export const startVoting = async (contract: any, account: string) => {
   try {
+    if (!contract) {
+      return { 
+        success: false, 
+        message: "Contract is not initialized"
+      };
+    }
+    
+    if (!account) {
+      const errorMsg = "No account provided to startVoting";
+      console.error(errorMsg, new Error().stack);
+      return { 
+        success: false, 
+        message: errorMsg
+      };
+    }
+
+    // Log the actual values being passed to checkIfAdmin
+    console.log(`startVoting: Checking admin status for account ${account}`);
+    
     // Verify admin status before proceeding
     const isAdmin = await checkIfAdmin(contract, account);
     if (!isAdmin) {
@@ -288,14 +318,25 @@ export const startVoting = async (contract: any, account: string) => {
       };
     }
     
+    console.log(`Starting voting with account: ${account}`);
     await contract.methods.startVoting().send({ from: account });
     return { success: true, message: 'Voting started successfully.' };
   } catch (error: any) {
     console.error('Error starting voting:', error);
     
     let errorMessage = 'Failed to start voting.';
-    if (error.message && error.message.includes('Voting already started')) {
-      errorMessage = 'Voting has already been started and is still in progress.';
+    if (error.message) {
+      if (error.message.includes('Voting already started')) {
+        errorMessage = 'Voting has already been started and is still in progress.';
+      } else if (error.message.includes('revert')) {
+        // Extract revert reason if available
+        const revertMatch = error.message.match(/reverted: (.*?)(?:"|$)/);
+        if (revertMatch && revertMatch[1]) {
+          errorMessage = `Contract error: ${revertMatch[1]}`;
+        } else {
+          errorMessage = 'Transaction was reverted by the contract';
+        }
+      }
     }
     
     return { success: false, message: errorMessage };
@@ -304,6 +345,22 @@ export const startVoting = async (contract: any, account: string) => {
 
 export const endVoting = async (contract: any, account: string) => {
   try {
+    if (!contract) {
+      return { 
+        success: false, 
+        message: "Contract is not initialized"
+      };
+    }
+    
+    if (!account) {
+      const errorMsg = "No account provided to endVoting";
+      console.error(errorMsg, new Error().stack);
+      return { 
+        success: false, 
+        message: errorMsg
+      };
+    }
+    
     // Verify admin status before proceeding
     const isAdmin = await checkIfAdmin(contract, account);
     if (!isAdmin) {
@@ -324,32 +381,23 @@ export const endVoting = async (contract: any, account: string) => {
   }
 };
 
-export const getRegistrationRequests = async (contract: any, account?: string) => {
+export const getRegistrationRequests = async (contract: any, account: string): Promise<string[]> => {
   try {
     // Enhanced debugging
     console.log(`getRegistrationRequests called with account:`, account);
     
+    // Check if contract is provided
+    if (!contract) {
+      console.error("No contract provided to getRegistrationRequests");
+      throw new Error("Contract not provided");
+    }
+    
     // Check if account is provided
     if (!account) {
-      // Try to get current account from web3 if available
-      try {
-        if (window.ethereum) {
-          const web3 = new Web3(window.ethereum);
-          const accounts = await web3.eth.getAccounts();
-          if (accounts && accounts.length > 0) {
-            account = accounts[0];
-            console.log(`Retrieved current account from web3:`, account);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to retrieve account from web3:", err);
-      }
-      
-      // If still no account, throw error
-      if (!account) {
-        console.error("No account provided to getRegistrationRequests", new Error().stack);
-        throw new Error("Account not provided");
-      }
+      // Log the error with stack trace for better debugging
+      const errorMsg = "No account provided to getRegistrationRequests";
+      console.error(errorMsg, new Error().stack);
+      throw new Error(errorMsg);
     }
 
     // First verify we're still using the owner account
@@ -361,13 +409,80 @@ export const getRegistrationRequests = async (contract: any, account?: string) =
     }
     
     console.log("Getting registration requests using account:", account);
-    // Pass the account explicitly in the call options
-    return await contract.methods.getRegistrationRequests().call({ from: account });
+    try {
+      // Pass the account explicitly in the call options and catch specific errors
+      const result = await contract.methods.getRegistrationRequests().call({ from: account });
+      return result || [];
+    } catch (contractError) {
+      console.error("Contract error in getRegistrationRequests:", contractError);
+      // Return empty array instead of throwing to make the UI more resilient
+      return [];
+    }
   } catch (error) {
     console.error('Error getting registration requests:', error);
     if (error instanceof Error) {
-      throw new Error(`Failed to get registration requests: ${error.message}`);
+      // Just log but don't throw, return an empty array instead
+      console.error(`Failed to get registration requests: ${error.message}`);
     }
     return [];
+  }
+};
+
+
+export const resetVoting = async (contract: any, account: string) => {
+  try {
+    if (!contract) {
+      return { 
+        success: false, 
+        message: "Contract is not initialized"
+      };
+    }
+    
+    if (!account) {
+      const errorMsg = "No account provided to resetVoting";
+      console.error(errorMsg, new Error().stack);
+      return { 
+        success: false, 
+        message: errorMsg
+      };
+    }
+    
+    // Verify admin status before proceeding
+    const isAdmin = await checkIfAdmin(contract, account);
+    if (!isAdmin) {
+      return { 
+        success: false, 
+        message: "Current account is not the contract owner. Please switch to the admin account in MetaMask."
+      };
+    }
+    
+    const status = await getVotingStatus(contract);
+    if (!status.isEnded) {
+      return { 
+        success: false, 
+        message: 'Voting must be ended before it can be reset.'
+      };
+    }
+    
+    console.log(`Resetting voting with account: ${account}`);
+    await contract.methods.resetVoting().send({ from: account });
+    return { success: true, message: 'Voting has been reset successfully.' };
+  } catch (error: any) {
+    console.error('Error resetting voting:', error);
+    
+    let errorMessage = 'Failed to reset voting.';
+    if (error.message) {
+      if (error.message.includes('revert')) {
+        // Extract revert reason if available
+        const revertMatch = error.message.match(/reverted: (.*?)(?:"|$)/);
+        if (revertMatch && revertMatch[1]) {
+          errorMessage = `Contract error: ${revertMatch[1]}`;
+        } else {
+          errorMessage = 'Transaction was reverted by the contract';
+        }
+      }
+    }
+    
+    return { success: false, message: errorMessage };
   }
 };
