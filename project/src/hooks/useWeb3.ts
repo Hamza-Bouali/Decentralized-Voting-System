@@ -34,7 +34,7 @@ export function useWeb3() {
           // Get network information
           try {
             const netId = await web3.eth.net.getId();
-            setNetworkId(netId);
+            setNetworkId(Number(netId));
             console.log(`Connected to network ID: ${netId}`);
           } catch (netErr) {
             console.error('Error getting network ID:', netErr);

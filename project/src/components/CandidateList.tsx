@@ -1,5 +1,5 @@
 import React from 'react';
-import { Candidate } from '../types';
+import { Candidate } from '../types'; // Adjust the import path as necessary
 
 interface CandidateListProps {
   candidates: Candidate[];
