@@ -88,11 +88,11 @@ function App() {
 
           await refreshData(contract, account);
         } else {
-          setWeb3State(prevState => ({ ...prevState, error }));
+          setWeb3State((prevState: Web3State) => ({ ...prevState, error }));
         }
       } catch (error) {
         console.error('Failed to initialize Web3:', error);
-        setWeb3State(prevState => ({ 
+        setWeb3State((prevState: Web3State) => ({ 
           ...prevState, 
           error: 'Failed to connect to blockchain. Please check your connection and try again.' 
         }));
@@ -150,11 +150,11 @@ function App() {
 
         await refreshData(contract, account);
       } else {
-        setWeb3State(prevState => ({ ...prevState, error }));
+        setWeb3State((prevState: Web3State) => ({ ...prevState, error }));
       }
     } catch (error) {
       console.error('Failed to initialize Web3:', error);
-      setWeb3State(prevState => ({ 
+      setWeb3State((prevState: Web3State) => ({ 
         ...prevState, 
         error: 'Failed to connect to blockchain. Please check your connection and try again.' 
       }));

@@ -3,10 +3,13 @@ import { twMerge } from 'tailwind-merge';
 import { clsx } from 'clsx';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'info';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'info' | 'ghost' | 'outline';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   isLoading?: boolean;
   fullWidth?: boolean;
+  iconLeft?: React.ReactNode;
+  iconRight?: React.ReactNode;
+  rounded?: boolean;
   children: React.ReactNode;
 }
 
@@ -17,6 +20,9 @@ const Button: React.FC<ButtonProps> = ({
   size = 'md',
   isLoading = false,
   fullWidth = false,
+  iconLeft,
+  iconRight,
+  rounded = false,
   disabled,
   ...props
 }) => {
@@ -27,22 +33,27 @@ const Button: React.FC<ButtonProps> = ({
     danger: 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white',
     warning: 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white',
     info: 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white',
+    ghost: 'bg-transparent hover:bg-gray-100 text-gray-700',
+    outline: 'bg-transparent border border-gray-300 text-gray-700 hover:bg-gray-50'
   };
 
   const sizeClasses = {
+    xs: 'px-2.5 py-1 text-xs',
     sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2',
+    md: 'px-4 py-2 text-base',
     lg: 'px-6 py-3 text-lg',
+    xl: 'px-8 py-4 text-xl',
   };
 
   return (
     <button
       className={twMerge(
         clsx(
-          'font-medium rounded-lg transition-all duration-200',
+          'font-medium transition-all duration-200 inline-flex items-center justify-center',
           'transform hover:scale-[1.02] active:scale-[0.98]',
-          'focus:outline-none focus:ring-2 focus:ring-offset-2',
+          'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-opacity-50',
           'shadow-md hover:shadow-lg',
+          rounded ? 'rounded-full' : 'rounded-lg',
           variantClasses[variant],
           sizeClasses[size],
           fullWidth ? 'w-full' : '',

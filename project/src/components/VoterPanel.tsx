@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   getVoterStatus, 
   requestRegistration, 
@@ -24,19 +24,18 @@ const VoterPanel: React.FC<VoterPanelProps> = ({ contract, account }) => {
     isEnded: false
   });
   const [candidates, setCandidates] = useState<any[]>([]);
-  const [selectedCandidate, setSelectedCandidate] = useState('');
+  const [selectedCandidate, setSelectedCandidate] = useState<string>('');
   const [message, setMessage] = useState({ type: '', text: '' });
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (contract && account) {
-      loadData();
-    }
-  }, [contract, account]);
+  // Track candidate data is loading
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
+      setLoadingCandidates(true); // Set loading state for candidates
+      
       const [status, voting, candidateList] = await Promise.all([
         getVoterStatus(contract, account),
         getVotingStatus(contract),
@@ -45,13 +44,38 @@ const VoterPanel: React.FC<VoterPanelProps> = ({ contract, account }) => {
 
       setVoterStatus(status);
       setVotingStatus(voting);
-      setCandidates(candidateList);
+      
+      // Important: Convert BigInt values to strings before setting state
+      const processedCandidates = candidateList.map(candidate => ({
+        ...candidate,
+        id: candidate.id.toString(), // Ensure id is a string
+        voteCount: candidate.voteCount.toString() // Ensure voteCount is a string
+      }));
+      
+      setCandidates(processedCandidates);
+      console.log('Loaded candidates after processing:', processedCandidates);
+      
+      // Reset selected candidate if not valid
+      if (selectedCandidate) {
+        const candidateExists = processedCandidates.some(c => c.id === selectedCandidate);
+        if (!candidateExists) {
+          console.log('Selected candidate no longer exists, resetting selection');
+          setSelectedCandidate('');
+        }
+      }
     } catch (err) {
       console.error('Error loading voter data:', err);
     } finally {
       setIsLoading(false);
+      setLoadingCandidates(false);
     }
-  };
+  }, [contract, account, selectedCandidate]);
+
+  useEffect(() => {
+    if (contract && account) {
+      loadData();
+    }
+  }, [contract, account, loadData]);
 
   const handleRequestRegistration = async () => {
     if (!contract || !account) return;
@@ -76,14 +100,67 @@ const VoterPanel: React.FC<VoterPanelProps> = ({ contract, account }) => {
     }
   };
 
+  const handleCandidateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    console.log(`Candidate selected - value type: ${typeof value}, value: "${value}"`);
+    setSelectedCandidate(value);
+    
+    // Verify the selection worked by logging the state after update
+    setTimeout(() => {
+      console.log('Updated selectedCandidate state:', selectedCandidate);
+    }, 0);
+    
+    // Clear any error messages when the user makes a selection
+    if (message.type === 'error' && message.text.includes('select a candidate')) {
+      setMessage({ type: '', text: '' });
+    }
+  };
+
   const handleVote = async () => {
-    if (!contract || !account || !selectedCandidate) return;
+    // Log current state before validation
+    console.log("Current state before voting:", {
+      selectedCandidate,
+      candidatesCount: candidates.length,
+      candidateIds: candidates.map(c => c.id)
+    });
+    
+    // Add extensive validation and logging
+    if (!contract) {
+      console.error("Cannot vote: Contract is not available");
+      setMessage({ type: 'error', text: 'Contract connection error' });
+      return;
+    }
+    
+    if (!account) {
+      console.error("Cannot vote: Account is not available");
+      setMessage({ type: 'error', text: 'Wallet account not connected' });
+      return;
+    }
+    
+    if (!selectedCandidate || selectedCandidate === "") {
+      console.error("Cannot vote: No candidate selected", { selectedCandidate });
+      setMessage({ type: 'error', text: 'Please select a candidate before voting' });
+      return;
+    }
 
     try {
       setIsLoading(true);
       setMessage({ type: '', text: '' });
       
+      // Log the actual candidate ID being sent
+      console.log(`Attempting to vote for candidate ID: ${selectedCandidate}`);
+      
+      // Verify the candidate exists before trying to vote
+      const candidateExists = candidates.some(c => c.id === selectedCandidate);
+      if (!candidateExists) {
+        console.error(`Candidate with ID ${selectedCandidate} not found in list:`, candidates);
+        setMessage({ type: 'error', text: `Selected candidate (ID: ${selectedCandidate}) not found` });
+        setIsLoading(false);
+        return;
+      }
+      
       const result = await voteForCandidate(contract, account, selectedCandidate);
+      console.log("Vote result:", result);
       
       if (result.success) {
         setMessage({ type: 'success', text: result.message });
@@ -97,6 +174,12 @@ const VoterPanel: React.FC<VoterPanelProps> = ({ contract, account }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Helper to get the candidate name by ID for display
+  const getCandidateName = (id: string) => {
+    const candidate = candidates.find(c => c.id === id);
+    return candidate ? candidate.name : `Unknown (ID: ${id})`;
   };
 
   const renderVoterStatusBadge = () => {
@@ -205,7 +288,7 @@ const VoterPanel: React.FC<VoterPanelProps> = ({ contract, account }) => {
         {voterStatus.hasVoted ? (
           <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4" role="alert">
             <p className="font-bold">You have already voted</p>
-            <p>You voted for candidate with ID: {voterStatus.vote}</p>
+            <p>You voted for: {getCandidateName(voterStatus.vote)}</p>
           </div>
         ) : (
           <>
@@ -213,26 +296,47 @@ const VoterPanel: React.FC<VoterPanelProps> = ({ contract, account }) => {
               <label htmlFor="candidate" className="block text-sm font-medium text-gray-700 mb-1">
                 Select Candidate
               </label>
+              
+              {/* Enhanced select component with better debugging */}
               <select
                 id="candidate"
                 value={selectedCandidate}
-                onChange={(e) => setSelectedCandidate(e.target.value)}
+                onChange={handleCandidateChange}
                 disabled={!votingStatus.isStarted || votingStatus.isEnded || !voterStatus.isRegistered || isLoading}
                 className="block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">Select a candidate</option>
-                {candidates.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    ID {candidate.id}: {candidate.name} ({candidate.voteCount} votes)
-                  </option>
-                ))}
+                {loadingCandidates ? (
+                  <option value="" disabled>Loading candidates...</option>
+                ) : candidates.length > 0 ? (
+                  candidates.map((candidate) => {
+                    // Add debug info to console
+                    console.log(`Rendering candidate option: ID=${candidate.id}, name=${candidate.name}`);
+                    return (
+                      <option key={candidate.id} value={candidate.id.toString()}>
+                        {candidate.name} (ID: {candidate.id}, Votes: {candidate.voteCount})
+                      </option>
+                    );
+                  })
+                ) : (
+                  <option value="" disabled>No candidates available</option>
+                )}
               </select>
+              
+              {/* Display the currently selected candidate ID for debugging */}
+              <div className="mt-2 p-2 bg-gray-50 rounded border text-sm">
+                <p><strong>Debug info:</strong></p>
+                <p>Selected candidate ID: "{selectedCandidate}"</p>
+                <p>Type: {typeof selectedCandidate}</p>
+                <p>Available IDs: {candidates.map(c => c.id).join(', ')}</p>
+              </div>
             </div>
             
             <button
               onClick={handleVote}
               disabled={
                 !selectedCandidate || 
+                selectedCandidate === "" || 
                 isLoading || 
                 !voterStatus.isRegistered || 
                 !votingStatus.isStarted || 
@@ -242,6 +346,12 @@ const VoterPanel: React.FC<VoterPanelProps> = ({ contract, account }) => {
             >
               {isLoading ? 'Processing...' : 'Cast Vote'}
             </button>
+            
+            {!selectedCandidate && (
+              <p className="text-sm text-yellow-600 mt-2">
+                Please select a candidate to vote for.
+              </p>
+            )}
             
             {!votingStatus.isStarted ? (
               <p className="text-sm text-yellow-600 mt-2">

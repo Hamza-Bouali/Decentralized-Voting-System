@@ -1,7 +1,7 @@
 import Web3 from 'web3';
 import { contractABI } from './contract';
 
-export const contractAddress = '0xE9732d3A3dFCaf5Bc35B37781E6639Bba25DBe11';
+export const contractAddress = '0xAE439a99F3B92494B5E734a3f1F74d22966908Aa';
 
 // Store the current connected account to detect changes
 let currentConnectedAccount = '';
@@ -169,6 +169,36 @@ export const requestRegistration = async (contract: any, account: string) => {
 
 export const voteForCandidate = async (contract: any, account: string, candidateId: string) => {
   try {
+    // Validate inputs
+    if (!candidateId || candidateId === "") {
+      return { 
+        success: false, 
+        message: 'Please select a candidate to vote for.' 
+      };
+    }
+    
+    // Validate that candidateId is a valid number
+    const candidateIdNum = parseInt(candidateId);
+    if (isNaN(candidateIdNum)) {
+      console.error(`Invalid candidate ID: ${candidateId} is not a valid number`);
+      return { 
+        success: false, 
+        message: 'Invalid candidate ID format.' 
+      };
+    }
+    
+    console.log(`Submitting vote for candidate ID: ${candidateId} from account: ${account}`);
+    
+    // Get the current status of the voter
+    const voterStatus = await contract.methods.voters(account).call();
+    if (voterStatus.hasVoted) {
+      return { 
+        success: false, 
+        message: 'You have already cast your vote.' 
+      };
+    }
+    
+    // Proceed with the vote
     await contract.methods.vote(candidateId).send({ from: account });
     return { success: true, message: 'Vote cast successfully.' };
   } catch (error: any) {
@@ -184,6 +214,12 @@ export const voteForCandidate = async (contract: any, account: string, candidate
         errorMessage = 'The candidate ID you entered is invalid.';
       } else if (error.message.includes('Voting is not active')) {
         errorMessage = 'Voting is not currently active.';
+      } else if (error.message.includes('revert')) {
+        // Extract the revert reason if available
+        const revertMatch = error.message.match(/reverted: (.*?)(?:"|$)/);
+        if (revertMatch && revertMatch[1]) {
+          errorMessage = `Smart contract error: ${revertMatch[1]}`;
+        }
       }
     }
     
