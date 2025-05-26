@@ -189,11 +189,10 @@ function App() {
     }
   };
 
-  // These functions aren't used in this component, but they're kept for potential future use
-  const handleRequestRegistration = async (): Promise<ActionResult> => {
+  const handleRequestRegistration = async (cin: string): Promise<ActionResult> => {
     if (!web3State.contract || !web3State.account) return { success: false, message: 'Wallet not connected' };
     
-    const result = await requestRegistration(web3State.contract, web3State.account);
+    const result = await requestRegistration(web3State.contract, web3State.account, cin);
     if (result.success) {
       await handleRefreshStatus();
     }

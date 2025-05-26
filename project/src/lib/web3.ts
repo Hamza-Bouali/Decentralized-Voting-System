@@ -1,7 +1,7 @@
 import Web3 from 'web3';
 import { contractABI } from './contract';
 
-export const contractAddress = '0xAE439a99F3B92494B5E734a3f1F74d22966908Aa';
+export const contractAddress = '0x1183338e09ecC0FD623Abf3A00346A89ac328dae';
 
 // Store the current connected account to detect changes
 let currentConnectedAccount = '';
@@ -154,15 +154,75 @@ export const getCandidates = async (contract: any) => {
   }
 };
 
-export const requestRegistration = async (contract: any, account: string) => {
+export const requestRegistration = async (contract: any, account: string, cin: string) => {
   try {
-    await contract.methods.requestVoterRegistration().send({ from: account });
+    // First check if the voter is already registered
+    const voterStatus = await contract.methods.voters(account).call();
+    if (voterStatus.isRegistered) {
+      return { 
+        success: false, 
+        message: 'You are already registered as a voter.' 
+      };
+    }
+
+    // Then check if they have already requested registration
+    if (voterStatus.hasRequested) {
+      return { 
+        success: false, 
+        message: 'You have already submitted a registration request.' 
+      };
+    }
+
+    // Validate CIN format
+    if (!cin || cin.trim() === '') {
+      return {
+        success: false,
+        message: 'Please provide a valid CIN number.'
+      };
+    }
+
+    // Attempt the registration
+    const receipt = await contract.methods.requestVoterRegistration(cin).send({ from: account });
+    
+    // Check if the transaction was successful
+    if (receipt.status === false) {
+      return {
+        success: false,
+        message: 'Transaction was reverted. Please check if your CIN has already been used.'
+      };
+    }
+
     return { success: true, message: 'Registration request sent successfully.' };
   } catch (error: any) {
     console.error('Error requesting registration:', error);
+    let errorMessage = 'Failed to send registration request.';
+    
+    if (error.message) {
+      // Check for specific revert reasons
+      if (error.message.includes('CIN already used')) {
+        errorMessage = 'This CIN has already been used for registration.';
+      } else if (error.message.includes('Already registered')) {
+        errorMessage = 'You are already registered as a voter.';
+      } else if (error.message.includes('Already requested')) {
+        errorMessage = 'You have already submitted a registration request.';
+      } else if (error.message.includes('revert')) {
+        // Try to extract the revert reason
+        const revertMatch = error.message.match(/reverted: (.*?)(?:"|$)/);
+        if (revertMatch && revertMatch[1]) {
+          errorMessage = `Registration failed: ${revertMatch[1]}`;
+        } else {
+          // If no specific reason, check the transaction receipt
+          if (error.receipt) {
+            console.log('Transaction receipt:', error.receipt);
+            errorMessage = 'Registration failed. Please check if you meet all requirements. ( The CIN is valid and correct )';
+          }
+        }
+      }
+    }
+    
     return { 
       success: false, 
-      message: error.message || 'Failed to send registration request.' 
+      message: errorMessage 
     };
   }
 };
@@ -520,5 +580,14 @@ export const resetVoting = async (contract: any, account: string) => {
     }
     
     return { success: false, message: errorMessage };
+  }
+};
+
+export const getCIN = async (contract: any, account: string, voterAddress: string): Promise<string> => {
+  try {
+    return await contract.methods.getCIN(voterAddress).call({ from: account });
+  } catch (error: any) {
+    console.error('Error getting CIN:', error);
+    throw new Error('Failed to get CIN information');
   }
 };

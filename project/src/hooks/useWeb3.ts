@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Web3 from 'web3';
 import { initializeWeb3, contractAddress, checkIfAdmin } from '../lib/web3';
-import { contractABI } from '../lib/contract';
 import { getCurrentAccount } from '../lib/account-utils';
 
 export function useWeb3() {

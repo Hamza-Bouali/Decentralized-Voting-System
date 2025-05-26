@@ -7,7 +7,8 @@ import {
   endVoting,
   getRegistrationRequests,
   getVotingStatus,
-  resetVoting // Add this import
+  resetVoting,
+  getCIN
 } from '../lib/web3';
 import { VotingState } from '../types';
 
@@ -45,6 +46,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [message, setMessage] = useState({ type: '', text: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [requestCINs, setRequestCINs] = useState<{[key: string]: string}>({});
   
   // Keep track if we're using direct Web3 or handler functions
   const useDirectWeb3 = Boolean(contract && account);
@@ -97,6 +99,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         
         setRegistrationRequests(requests);
         setVotingStatus(status);
+
+        // Load CINs for each request
+        const cinMap: {[key: string]: string} = {};
+        for (const address of requests) {
+          try {
+            const cin = await getCIN(contract, account as string, address);
+            cinMap[address] = cin;
+          } catch (error) {
+            console.error(`Error getting CIN for ${address}:`, error);
+            cinMap[address] = 'Error loading CIN';
+          }
+        }
+        setRequestCINs(cinMap);
       } else if (onGetRequests) {
         console.log('AdminPanel: Loading data via handler functions');
         const requests = await onGetRequests();
@@ -451,51 +466,37 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       </div>
       
-      <div className="bg-white rounded-lg shadow-md p-6 mt-8">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">Registration Requests</h3>
-          <button
-            onClick={handleGetRequests}
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-            disabled={isLoading}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Refresh Requests
-          </button>
-        </div>
-        
-        {isLoading ? (
-          <div className="flex items-center justify-center p-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          </div>
-        ) : registrationRequests.length > 0 ? (
-          <ul className="divide-y divide-gray-200">
+      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Registration Requests</h3>
+        {registrationRequests.length === 0 ? (
+          <p className="text-gray-500">No pending registration requests</p>
+        ) : (
+          <div className="space-y-4">
             {registrationRequests.map((address) => (
-              <li key={address} className="py-4 flex items-center justify-between">
-                <div className="font-mono text-sm">{address}</div>
-                <div className="space-x-2">
+              <div key={address} className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{address}</p>
+                  <p className="text-sm text-gray-500">CIN: {requestCINs[address] || 'Loading...'}</p>
+                </div>
+                <div className="flex space-x-2">
                   <button
                     onClick={() => handleApproveVoter(address)}
                     disabled={isLoading}
-                    className="bg-green-100 hover:bg-green-200 text-green-800 py-1 px-3 rounded text-sm"
+                    className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm"
                   >
                     Approve
                   </button>
                   <button
                     onClick={() => handleRejectVoter(address)}
                     disabled={isLoading}
-                    className="bg-red-100 hover:bg-red-200 text-red-800 py-1 px-3 rounded text-sm"
+                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
                   >
                     Reject
                   </button>
                 </div>
-              </li>
+              </div>
             ))}
-          </ul>
-        ) : (
-          <p className="text-gray-500 py-4">No pending registration requests.</p>
+          </div>
         )}
       </div>
     </div>

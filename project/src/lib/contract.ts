@@ -119,6 +119,25 @@ export const contractABI = [
 		"type": "function"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_voter",
+				"type": "address"
+			}
+		],
+		"name": "getCIN",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"name": "getRegistrationRequests",
 		"outputs": [
@@ -190,7 +209,13 @@ export const contractABI = [
 		"type": "function"
 	},
 	{
-		"inputs": [],
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_cin",
+				"type": "string"
+			}
+		],
 		"name": "requestVoterRegistration",
 		"outputs": [],
 		"stateMutability": "nonpayable",
@@ -252,6 +277,11 @@ export const contractABI = [
 				"internalType": "bool",
 				"name": "hasRequested",
 				"type": "bool"
+			},
+			{
+				"internalType": "string",
+				"name": "cin",
+				"type": "string"
 			}
 		],
 		"stateMutability": "view",

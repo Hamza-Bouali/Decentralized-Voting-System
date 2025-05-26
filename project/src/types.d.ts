@@ -23,6 +23,7 @@ declare interface Voter {
   hasVoted: boolean;
   vote: string;
   hasRequested: boolean;
+  cin: string;
 }
 
 // Voting status

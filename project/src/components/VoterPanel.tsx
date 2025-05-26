@@ -17,7 +17,8 @@ const VoterPanel: React.FC<VoterPanelProps> = ({ contract, account }) => {
     isRegistered: false,
     hasVoted: false,
     vote: '0',
-    hasRequested: false
+    hasRequested: false,
+    cin: ''
   });
   const [votingStatus, setVotingStatus] = useState({
     isStarted: false,
@@ -27,6 +28,7 @@ const VoterPanel: React.FC<VoterPanelProps> = ({ contract, account }) => {
   const [selectedCandidate, setSelectedCandidate] = useState<string>('');
   const [message, setMessage] = useState({ type: '', text: '' });
   const [isLoading, setIsLoading] = useState(false);
+  const [cin, setCin] = useState('');
 
   // Track candidate data is loading
   const [loadingCandidates, setLoadingCandidates] = useState(false);
@@ -79,12 +81,28 @@ const VoterPanel: React.FC<VoterPanelProps> = ({ contract, account }) => {
 
   const handleRequestRegistration = async () => {
     if (!contract || !account) return;
+    
+    // Validate CIN format
+    if (!cin.trim()) {
+      setMessage({ type: 'error', text: 'Please enter your CIN number' });
+      return;
+    }
+
+    // Basic CIN format validation (adjust according to your CIN format requirements)
+    const cinRegex = /^[A-Z0-9]{7,}$/; // Example: At least 8 alphanumeric characters
+    if (!cinRegex.test(cin)) {
+      setMessage({ 
+        type: 'error', 
+        text: 'Please enter a valid CIN number (at least 7 alphanumeric characters)' 
+      });
+      return;
+    }
 
     try {
       setIsLoading(true);
       setMessage({ type: '', text: '' });
       
-      const result = await requestRegistration(contract, account);
+      const result = await requestRegistration(contract, account, cin);
       
       if (result.success) {
         setMessage({ type: 'success', text: result.message });
@@ -94,7 +112,10 @@ const VoterPanel: React.FC<VoterPanelProps> = ({ contract, account }) => {
       }
     } catch (err) {
       console.error('Error requesting registration:', err);
-      setMessage({ type: 'error', text: 'Error requesting registration. See console for details.' });
+      setMessage({ 
+        type: 'error', 
+        text: 'Error requesting registration. Please try again or contact support if the problem persists.' 
+      });
     } finally {
       setIsLoading(false);
     }
@@ -262,13 +283,38 @@ const VoterPanel: React.FC<VoterPanelProps> = ({ contract, account }) => {
         </div>
         
         {!voterStatus.isRegistered && !voterStatus.hasRequested && (
-          <div className="mb-6">
-            <button 
+          <div className="mt-4">
+            <div className="mb-4">
+              <label htmlFor="cin" className="block text-sm font-medium text-gray-700 mb-1">
+                CIN Number
+              </label>
+              <input
+                type="text"
+                id="cin"
+                value={cin}
+                onChange={(e) => {
+                  setCin(e.target.value.toUpperCase()); // Convert to uppercase
+                  // Clear error message when user starts typing
+                  if (message.type === 'error') {
+                    setMessage({ type: '', text: '' });
+                  }
+                }}
+                className={`w-full px-3 py-2 border ${
+                  message.type === 'error' ? 'border-red-300' : 'border-gray-300'
+                } rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                placeholder="Enter your CIN number"
+                disabled={isLoading}
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Your CIN number must be at least 8 alphanumeric characters (letters and numbers only)
+              </p>
+            </div>
+            <button
               onClick={handleRequestRegistration}
-              disabled={isLoading || voterStatus.hasRequested}
-              className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 disabled:opacity-50"
+              disabled={isLoading || !cin.trim()}
+              className="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
             >
-              {isLoading ? 'Processing...' : 'Request Registration'}
+              {isLoading ? 'Requesting...' : 'Request Registration'}
             </button>
           </div>
         )}
